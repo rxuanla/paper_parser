@@ -1,0 +1,4 @@
+parser_env/
+test/
+*.txt
+*.docx

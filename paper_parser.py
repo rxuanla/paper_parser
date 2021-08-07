@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import requests
 import json
 import mysql.connector
@@ -6,10 +7,7 @@ import traceback
 import os
 import time
 from random import randint
-from time import sleep
 from bs4 import BeautifulSoup
-
-
 
 
 def db_connect():
@@ -24,19 +22,19 @@ def getHtml_ByGet(url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36'}
     try:
-        sleep(randint(12,25))
+        time.sleep(randint(12,25))
         response = requests.get(url, timeout=50, headers=headers)
         response.raise_for_status()
         response.encoding = response.apparent_encoding
         return response.text
     except:
-        with open('errorLog'.encoding(), 'ab+') as f:
+        with open('GetErrorLog.txt', 'a') as f:
             traceback.print_exc(file=f)
 
 
 def DownloadPaper(DocumentNumber, source, year, PaperTitle):
     try:
-        sleep(randint(5,10))
+        time.sleep(randint(5,10))
         download_url = 'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber='+DocumentNumber
         response = requests.get(download_url, timeout=50, headers=headers)
 
@@ -54,13 +52,9 @@ def DownloadPaper(DocumentNumber, source, year, PaperTitle):
             print('Start download file: ', PaperTitle, '\n')
             f.write(response.content)
 
-        #old version
-        #file_path = download_path+PaperTitle+'.pdf'
-        #with open(PaperTitle+'.pdf', 'ab+') as f:
-        #    print('Start download file: ', PaperTitle, '\n')
-        #    f.write(response.content)
-    except:
-        with open('DownloadErrorLog.txt', 'ab+') as f:
+    except: 
+        traceback.print_exc()
+        with open('DownloadErrorLog.txt', 'a') as f:
             traceback.print_exc(file=f)
 
 
@@ -70,8 +64,12 @@ if __name__ == '__main__':
     pageNumber = 1
     seconds = time.time()
     local_time = time.ctime(seconds)
-    with open('mainErrorLog.txt', 'a') as f:
-        f.write("-----------------"+local_time+"-----------------\n")
+    MainErrorLog_path = 'MainErrorLog.txt'
+    with open(MainErrorLog_path, 'a') as f:
+        f.write("----------------------------------"+local_time+"----------------------------------\n")
+    
+    with open('DownloadErrorLog.txt', 'a') as f:
+        f.write("----------------------------------"+local_time+"----------------------------------\n")
     # 此頁面利用 Ajax 載入 paper list ，無法直接解析頁面
     # 取得所有標題
     while True:
@@ -112,8 +110,6 @@ if __name__ == '__main__':
 
         for paper in papers['records']:
             print(paper['articleTitle'])
-            #IEEE_response = requests.get(url='https://ieeexplore.ieee.org/'+paper['documentLink'])
-            #soup = BeautifulSoup(IEEE_response.text, 'lxml')  
             
             try: 
                 soup = BeautifulSoup(getHtml_ByGet('https://ieeexplore.ieee.org/'+paper['documentLink']), 'lxml')  
@@ -143,18 +139,17 @@ if __name__ == '__main__':
                     'Referer': 'https://ieeexplore.ieee.org/'+papers['records'][15]['documentLink'],
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36'
                 }
-                sleep(randint(2,6))
+                time.sleep(randint(2,6))
                 IEEE_response = requests.get(url=citation_url, headers=headers,timeout=50)
                 citation_json = json.loads(IEEE_response.text)
                 #print("\nCitation: "+citation_json['data'])
                 DownloadPaper(json_data['articleId'], 'ICSE', 2020, json_data['title'])
             except :
                 traceback.print_exc()
-                file = open("MainErrorLog.txt", 'a')
-                data = file.write(paper['articleTitle']+"\n")
-                file.close()
-                #with open('mainErrorLog.txt', 'ab+') as f:
-                #    f.write(paper['articleTitle'])
+                with open(MainErrorLog_path, 'a') as f:
+                    f.write(paper['articleTitle']+"\n")
+                    traceback.print_exc(file=f)
+
                 continue
 
         #翻頁

@@ -32,12 +32,8 @@ def getHtml_ByGet(url):
             traceback.print_exc(file=f)
 
 
-def DownloadPaper(DocumentNumber, source, year, PaperTitle):
+def DownloadPaper(DocumentNumber, source, year, PaperTitle,pdfSize):
     try:
-        time.sleep(randint(5,10))
-        download_url = 'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber='+DocumentNumber
-        response = requests.get(download_url, timeout=50, headers=headers)
-
         download_path = r".\static"  + "\{}\{}" .format(source,year) + "\\"
         PaperTitle = re.sub(r"[^a-zA-Z0-9]","_",PaperTitle)
         file_path = download_path+PaperTitle+'.pdf' 
@@ -48,13 +44,25 @@ def DownloadPaper(DocumentNumber, source, year, PaperTitle):
 
         #print("download_path: "+download_path)
         #print("file_path: "+file_path)
-        with open(file_path, 'ab+') as f:
-            print('Start download file: ', PaperTitle, '\n')
-            f.write(response.content)
+        while True:
+            time.sleep(randint(5,10))
+            download_url = 'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber='+DocumentNumber
+            response = requests.get(download_url, timeout=50, headers=headers)
+            with open(file_path, 'wb+') as f:
+                print('Start download file: ', PaperTitle, '\n')
+                f.write(response.content)
+            fileSize = os.path.getsize(file_path)
+            #print(fileSize)
+            #print("fileSize type: " + str(type(fileSize)))
+            #print(pdfSize)
+            #print("pdfSize type: " + str(type(pdfSize)))
+            if fileSize/1024  > int(pdfSize):
+                break            
 
     except: 
         traceback.print_exc()
         with open('DownloadErrorLog.txt', 'a') as f:
+            f.write("\n--------------------------------------------"+PaperTitle+"--------------------------------------------\n")
             traceback.print_exc(file=f)
 
 
@@ -66,10 +74,12 @@ if __name__ == '__main__':
     local_time = time.ctime(seconds)
     MainErrorLog_path = 'MainErrorLog.txt'
     with open(MainErrorLog_path, 'a') as f:
-        f.write("----------------------------------"+local_time+"----------------------------------\n")
+        f.seek(0)
+        f.write("--------------------------------------------"+local_time+"--------------------------------------------\n")
     
     with open('DownloadErrorLog.txt', 'a') as f:
-        f.write("----------------------------------"+local_time+"----------------------------------\n")
+        f.seek(0)
+        f.write("--------------------------------------------"+local_time+"--------------------------------------------\n")
     # 此頁面利用 Ajax 載入 paper list ，無法直接解析頁面
     # 取得所有標題
     while True:
@@ -86,12 +96,12 @@ if __name__ == '__main__':
 
         # 翻頁改 pagenumber
         data = {
-            'isnumber': '9283910',
+            'isnumber': '9401950',
             'pageNumber': str(pageNumber),
-            'punumber': '9283875'
+            'punumber': '9401807'
         }
 
-        IEEE_response = requests.post(url = 'https://ieeexplore.ieee.org/rest/search/pub/9283875/issue/9283910/toc',data= json.dumps(data), headers = headers)
+        IEEE_response = requests.post(url = 'https://ieeexplore.ieee.org/rest/search/pub/9401807/issue/9401950/toc',data= json.dumps(data), headers = headers)
         papers = json.loads(IEEE_response.text)
         #print(papers)
         #print(data['pageNumber'])
@@ -143,7 +153,7 @@ if __name__ == '__main__':
                 IEEE_response = requests.get(url=citation_url, headers=headers,timeout=50)
                 citation_json = json.loads(IEEE_response.text)
                 #print("\nCitation: "+citation_json['data'])
-                DownloadPaper(json_data['articleId'], 'ICSE', 2020, json_data['title'])
+                DownloadPaper(json_data['articleId'], 'ICSE', 2021, json_data['title'],paper['pdfSize'])
             except :
                 traceback.print_exc()
                 with open(MainErrorLog_path, 'a') as f:

@@ -33,11 +33,10 @@ def getHtml_ByGet(url):
             traceback.print_exc(file=f)
 
 
-def DownloadPaper(DocumentNumber, source, year, PaperTitle,pdfSize):
+def DownloadPaper(DocumentNumber, source, year, PaperID,pdfSize):
     try:
         download_path = r".\static"  + "\{}\{}" .format(source,year) + "\\"
-        PaperTitle = re.sub(r"[^a-zA-Z0-9]","_",PaperTitle)
-        file_path = download_path+PaperTitle+'.pdf' 
+        file_path = download_path+str(PaperID)+'.pdf' 
 
         if not os.path.isdir(download_path):
             print("路徑不存在，建立路徑。")
@@ -50,7 +49,7 @@ def DownloadPaper(DocumentNumber, source, year, PaperTitle,pdfSize):
             download_url = 'https://ieeexplore.ieee.org/stampPDF/getPDF.jsp?tp=&arnumber='+DocumentNumber
             response = requests.get(download_url, timeout=50, headers=headers)
             with open(file_path, 'wb+') as f:
-                print('Start download file: ', PaperTitle, '\n')
+                print('Start download file ', '\n')
                 f.write(response.content)
             fileSize = os.path.getsize(file_path)
             #print(fileSize)
@@ -63,18 +62,19 @@ def DownloadPaper(DocumentNumber, source, year, PaperTitle,pdfSize):
     except: 
         traceback.print_exc()
         with open('DownloadErrorLog.txt', 'a') as f:
-            f.write("\n--------------------------------------------"+PaperTitle+"--------------------------------------------\n")
+            f.write("\n-------------------------------------------PaperID: "+PaperID+"--------------------------------------------\n")
             traceback.print_exc(file=f)
 
 
 if __name__ == '__main__':
 
-    #
+    #download setting
     pageNumber = 1  # 翻頁改 pageNumber
     isnumber = 9489265
     punumber = 32
     source = 'TSE'  # "ICSE", "TSE", "KDE"
     year = 2021
+    idxCount = 0
     seconds = time.time()
     local_time = time.ctime(seconds)
     MainErrorLog_path = 'MainErrorLog.txt'
@@ -103,16 +103,15 @@ if __name__ == '__main__':
         IEEE_response = requests.post(url = 'https://ieeexplore.ieee.org/rest/search/pub/'+str(punumber)+'/issue/'+str(isnumber)+'/toc',data= json.dumps(payload), headers = headers)
         papers = json.loads(IEEE_response.text)
         #print(papers)
+        #print(payload['pageNumber'])
+        #print(payload)
+        #print("payload type: " + str(type(payload)))   #payload type: <class 'dict'>
+        #print(type(payload['pageNumber']))
         #print(data['pageNumber'])
-        #print(data)
-        #print("data type: " + str(type(data)))
-        #print(type(data['pageNumber']))
-        #print(data['pageNumber'])
-        #print("data['pageNumber'] : " + str(data['pageNumber']) )
-        #print("data['pageNumber'] type: " + str(type(data['pageNumber'])))
-        ##print(headers['Referer'])
-        #print(type(data['pageNumber']))
-        #print("papers type: " + str(type(papers)))
+        #print("payload['pageNumber'] : " + str(payload['pageNumber']) )
+        #print("payload['pageNumber'] type: " + str(type(payload['pageNumber'])))
+        #print(headers['Referer'])
+        #print("papers type: " + str(type(papers)))     #papers type: <class 'dict'>
         #print("papers['totalPages'] : " + str(papers['totalPages']) )
         #print("papers['totalPages'] type: " + str(type(papers['totalPages'])))
         
@@ -121,6 +120,7 @@ if __name__ == '__main__':
             print(paper['articleTitle'])
             
             try: 
+                idxCount+=1
                 soup = BeautifulSoup(getHtml_ByGet('https://ieeexplore.ieee.org/'+paper['documentLink']), 'lxml')  
                 pattern = re.compile( r'xplGlobal.document.metadata=(.*?});', re.MULTILINE | re.DOTALL)
                 script = soup.find("script", text=pattern)
@@ -168,12 +168,13 @@ if __name__ == '__main__':
                     cursor.execute(addPaper,paperData)
                     cnx.commit()
                     #新增Authorlist
-
+                    paperID = int(cursor.lastrowid)
                     #新增Domain
                     cursor.close()
                     cnx.close()
                 '''
-                DownloadPaper(json_data['articleId'], source, year, json_data['title'],paper['pdfSize'])
+                #DownloadPaper(json_data['articleId'], source, year, paperID, paper['pdfSize'])
+                DownloadPaper(json_data['articleId'], source, year, idxCount,paper['pdfSize'])
             except:
                 traceback.print_exc()
                 with open(MainErrorLog_path, 'a') as f:

@@ -2,6 +2,7 @@
 import requests
 import json
 import mysql.connector
+from mysql.connector import errorcode
 import re
 import traceback
 import os
@@ -68,8 +69,12 @@ def DownloadPaper(DocumentNumber, source, year, PaperTitle,pdfSize):
 
 if __name__ == '__main__':
 
-    # 翻頁改 pageNumber
-    pageNumber = 1
+    #
+    pageNumber = 1  # 翻頁改 pageNumber
+    isnumber = 9489265
+    punumber = 32
+    source = 'TSE'  # "ICSE", "TSE", "KDE"
+    year = 2021
     seconds = time.time()
     local_time = time.ctime(seconds)
     MainErrorLog_path = 'MainErrorLog.txt'
@@ -84,24 +89,18 @@ if __name__ == '__main__':
     # 取得所有標題
     while True:
         headers = {
-        'Accept': 'application/json,text/plain,*/*',
-        'Accept-Encoding': 'gzip,deflate,br',
-        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Connection': 'keep-alive',
-        'Content-Length': '58',
-        'Content-Type': 'application/json',
-        'Referer': 'https://ieeexplore.ieee.org/xpl/conhome/9401807/proceeding?pageNumber='+str(pageNumber),
+        'Referer': 'https://ieeexplore.ieee.org/xpl/conhome/'+str(punumber)+'/proceeding?pageNumber='+str(pageNumber),
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36'
         }
-
-        # 翻頁改 pagenumber
-        data = {
-            'isnumber': '9401950',
-            'pageNumber': str(pageNumber),
-            'punumber': '9401807'
+        #'Referer': 'https://ieeexplore.ieee.org/xpl/conhome/'+str(punumber)+'/proceeding?pageNumber='+str(pageNumber),
+        # 翻頁改 pagenumber ; TSE沒有page number
+        payload = {
+            'isnumber': str(isnumber),
+            'punumber': str(punumber),
+            'sortType': 'vol-only-seq'
         }
 
-        IEEE_response = requests.post(url = 'https://ieeexplore.ieee.org/rest/search/pub/9401807/issue/9401950/toc',data= json.dumps(data), headers = headers)
+        IEEE_response = requests.post(url = 'https://ieeexplore.ieee.org/rest/search/pub/'+str(punumber)+'/issue/'+str(isnumber)+'/toc',data= json.dumps(payload), headers = headers)
         papers = json.loads(IEEE_response.text)
         #print(papers)
         #print(data['pageNumber'])
@@ -140,26 +139,46 @@ if __name__ == '__main__':
                 citation_url = 'https://ieeexplore.ieee.org/rest/search/citation/format?recordIds=' + json_data['articleNumber']+'&download-format=download-bibtex&lite=true'
 
                 headers = {
-                    'Accept': 'application/json,text/plain,*/*',
-                    'Accept-Encoding': 'gzip,deflate,br',
-                    'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.6',
-                    'Connection': 'keep-alive',
-                    'Content-Length': '58',
-                    'Content-Type': 'application/json',
-                    'Referer': 'https://ieeexplore.ieee.org/'+papers['records'][15]['documentLink'],
+                    'Referer': 'https://ieeexplore.ieee.org/'+paper['documentLink'],
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36'
                 }
                 time.sleep(randint(2,6))
                 IEEE_response = requests.get(url=citation_url, headers=headers,timeout=50)
                 citation_json = json.loads(IEEE_response.text)
                 #print("\nCitation: "+citation_json['data'])
-                DownloadPaper(json_data['articleId'], 'ICSE', 2021, json_data['title'],paper['pdfSize'])
-            except :
+                #寫入資料庫
+                '''
+                try:
+                    cnx = mysql.connector.connect(user='root', password='thomas3198',
+                                  host='127.0.0.1',
+                                  database='Paper_parser')
+                except mysql.connector.Error as err:
+                    with open(MainErrorLog_path, 'a') as f:
+                        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+                            f.write("Something is wrong with your user name or password\n")
+                            print("Something is wrong with your user name or password\n")
+                        else:
+                            f.write(str(err)+"\n")
+                            print(err)
+                else:
+                    cursor = cnx.cursor()
+                    #新增Paper detail
+                    addPaper = ("INSERT INTO paper (Title, Year, Source, Abstract, Citation) VALUES (%s,%s,%s,%s,%s)")
+                    paperData = (paper['articleTitle'],2021,1,json_data['abstract'],citation_json['data'])
+                    cursor.execute(addPaper,paperData)
+                    cnx.commit()
+                    #新增Authorlist
+
+                    #新增Domain
+                    cursor.close()
+                    cnx.close()
+                '''
+                DownloadPaper(json_data['articleId'], source, year, json_data['title'],paper['pdfSize'])
+            except:
                 traceback.print_exc()
                 with open(MainErrorLog_path, 'a') as f:
                     f.write(paper['articleTitle']+"\n")
                     traceback.print_exc(file=f)
-
                 continue
 
         #翻頁

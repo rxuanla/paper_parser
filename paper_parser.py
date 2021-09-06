@@ -70,10 +70,10 @@ if __name__ == '__main__':
 
     #download setting
     pageNumber = 1  # 翻頁改 pageNumber
-    isnumber = 9489265
-    punumber = 32
+    isnumber = 9257116
+    punumber = 32  #TSE 均為32
     source = 'TSE'  # "ICSE", "TSE", "KDE"
-    year = 2021
+    year = 2020
     idxCount = 0
     seconds = time.time()
     local_time = time.ctime(seconds)
@@ -147,11 +147,74 @@ if __name__ == '__main__':
                 citation_json = json.loads(IEEE_response.text)
                 #print("\nCitation: "+citation_json['data'])
                 #寫入資料庫
-                '''
+                
                 try:
                     cnx = mysql.connector.connect(user='root', password='thomas3198',
                                   host='127.0.0.1',
                                   database='Paper_parser')
+                    cursor = cnx.cursor()
+                    #新增Paper detail
+                    addStatement = ("INSERT INTO paper (Title, Year, Source, Abstract, Citation) VALUES (%s,%s,%s,%s,%s)")
+                    StatementData = (paper['articleTitle'],2021,1,json_data['abstract'],citation_json['data'])
+                    cursor.execute(addStatement,StatementData)
+                    cnx.commit()
+                    paperID = int(cursor.lastrowid)
+
+                    #新增Authorlist
+                    for author in json_data['authors']:
+                        try:
+                            addStatement = ("INSERT INTO authorlist (Name, Department) VALUES (%s,%s)")
+                            StatementData = (author['name'],author['affiliation'][0])
+                            cursor.execute(addStatement,StatementData)
+                            cnx.commit()
+                            authorID = int(cursor.lastrowid)
+
+                        except mysql.connector.IntegrityError as err:
+                            #search duplicaate authorID
+                            if err.errno == errorcode.ER_DUP_ENTRY:
+                                cursor = cnx.cursor()
+                                addStatement = ("SELECT AuthorID FROM authorlist WHERE Name = %s")
+                                cursor.execute(addStatement,(author['name'],))
+                                result = cursor.fetchone()
+                                #print(str(type(result))) #type:<class 'tuple'>
+                                authorID= result[0]  
+                        except mysql.connector.Error as err:
+                                    traceback.print_exc()
+                                    with open(MainErrorLog_path, 'a') as f:
+                                        f.write(paper['articleTitle']+"\n")
+                                        traceback.print_exc(file=f)
+                                    continue
+                        finally:
+                            addStatement = ("INSERT INTO paperauthors (PaperID, AuthorID) VALUES (%s,%s)")
+                            StatementData = (paperID,authorID)
+                            cursor.execute(addStatement,StatementData)
+                            cnx.commit()
+
+                    #新增Domainlist
+                    for kwd_type in json_data['keywords']:
+                        for kwd in kwd_type['kwd']:
+                            try:
+                                addStatement = ("INSERT INTO domainlist (Keyword) VALUES (%s)")
+                                cursor.execute(addStatement,(kwd,))
+                                cnx.commit()
+                                keywordID = int(cursor.lastrowid)
+                            except mysql.connector.IntegrityError as err:
+                                if err.errno == errorcode.ER_DUP_ENTRY:
+                                    addStatement = ("SELECT KeywordID FROM domainlist WHERE Keyword = %s")
+                                    cursor.execute(addStatement,(kwd,))
+                                    result = cursor.fetchone()
+                                    keywordID= result[0]  
+                            except mysql.connector.Error as err:
+                                traceback.print_exc()
+                                with open(MainErrorLog_path, 'a') as f:
+                                    f.write(paper['articleTitle']+"\n")
+                                    traceback.print_exc(file=f)
+                                continue
+                            finally:
+                                addStatement = ("INSERT INTO paperdomains (PaperID, KeywordID) VALUES (%s,%s)")
+                                StatementData = (paperID,keywordID)
+                                cursor.execute(addStatement,StatementData)
+
                 except mysql.connector.Error as err:
                     with open(MainErrorLog_path, 'a') as f:
                         if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
@@ -160,21 +223,11 @@ if __name__ == '__main__':
                         else:
                             f.write(str(err)+"\n")
                             print(err)
-                else:
-                    cursor = cnx.cursor()
-                    #新增Paper detail
-                    addPaper = ("INSERT INTO paper (Title, Year, Source, Abstract, Citation) VALUES (%s,%s,%s,%s,%s)")
-                    paperData = (paper['articleTitle'],2021,1,json_data['abstract'],citation_json['data'])
-                    cursor.execute(addPaper,paperData)
-                    cnx.commit()
-                    #新增Authorlist
-                    paperID = int(cursor.lastrowid)
-                    #新增Domain
+                finally:    
                     cursor.close()
                     cnx.close()
-                '''
-                #DownloadPaper(json_data['articleId'], source, year, paperID, paper['pdfSize'])
-                DownloadPaper(json_data['articleId'], source, year, idxCount,paper['pdfSize'])
+
+                DownloadPaper(json_data['articleId'], source, year, paperID, paper['pdfSize'])
             except:
                 traceback.print_exc()
                 with open(MainErrorLog_path, 'a') as f:

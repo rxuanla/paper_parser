@@ -72,9 +72,15 @@ if __name__ == '__main__':
     pageNumber = 1  # 翻頁改 pageNumber
     isnumber = 9257116
     punumber = 32  #TSE 均為32
-    source = 'TSE'  # "ICSE", "TSE", "KDE"
+    source = "TSE"  # "ICSE"=1 , "TSE"=2, "KDE"=3
     year = 2020
-    idxCount = 0
+
+    if source == "ICSE":
+        sourceID = 1
+    elif source == "TSE":
+        sourceID =  2
+    elif source == "KDE":
+        sourceID = 3
     seconds = time.time()
     local_time = time.ctime(seconds)
     MainErrorLog_path = 'MainErrorLog.txt'
@@ -120,7 +126,6 @@ if __name__ == '__main__':
             print(paper['articleTitle'])
             
             try: 
-                idxCount+=1
                 soup = BeautifulSoup(getHtml_ByGet('https://ieeexplore.ieee.org/'+paper['documentLink']), 'lxml')  
                 pattern = re.compile( r'xplGlobal.document.metadata=(.*?});', re.MULTILINE | re.DOTALL)
                 script = soup.find("script", text=pattern)
@@ -155,7 +160,7 @@ if __name__ == '__main__':
                     cursor = cnx.cursor()
                     #新增Paper detail
                     addStatement = ("INSERT INTO paper (Title, Year, Source, Abstract, Citation) VALUES (%s,%s,%s,%s,%s)")
-                    StatementData = (paper['articleTitle'],2021,1,json_data['abstract'],citation_json['data'])
+                    StatementData = (paper['articleTitle'],year,sourceID,json_data['abstract'],citation_json['data'])
                     cursor.execute(addStatement,StatementData)
                     cnx.commit()
                     paperID = int(cursor.lastrowid)
